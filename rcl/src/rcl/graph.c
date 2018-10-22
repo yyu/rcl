@@ -27,7 +27,7 @@ extern "C"
 #include "rmw/names_and_types.h"
 #include "rmw/rmw.h"
 
-#include "./common.h"
+#include "common.h"
 
 rcl_ret_t
 rcl_get_topic_names_and_types(

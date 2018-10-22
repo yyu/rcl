@@ -30,8 +30,8 @@ extern "C"
 #include "rmw/rmw.h"
 #include "rmw/validate_full_topic_name.h"
 
-#include "./common.h"
-#include "./stdatomic_helper.h"
+#include "common.h"
+#include "stdatomic_helper.h"
 
 typedef struct rcl_client_impl_t
 {

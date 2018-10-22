@@ -17,8 +17,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#include "./common.h"
-#include "./stdatomic_helper.h"
+#include "common.h"
+#include "stdatomic_helper.h"
 #include "rcl/allocator.h"
 #include "rcl/error_handling.h"
 #include "rcutils/time.h"

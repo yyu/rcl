@@ -18,8 +18,8 @@
 
 #include <string.h>
 
-#include "./arguments_impl.h"
-#include "./remap_impl.h"
+#include "arguments_impl.h"
+#include "remap_impl.h"
 #include "rcl/error_handling.h"
 #include "rcl/lexer_lookahead.h"
 #include "rcl/validate_topic_name.h"

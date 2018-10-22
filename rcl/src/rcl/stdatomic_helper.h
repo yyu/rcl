@@ -40,7 +40,7 @@
 
 #else  // !defined(_WIN32)
 
-#include "./stdatomic_helper/win32/stdatomic.h"
+#include "stdatomic_helper/win32/stdatomic.h"
 
 #define rcl_atomic_load(object, out) rcl_win32_atomic_load(object, out)
 

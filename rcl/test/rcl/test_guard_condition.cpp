@@ -19,7 +19,7 @@
 #include "rcl/rcl.h"
 #include "rcl/guard_condition.h"
 
-#include "./failing_allocator_functions.hpp"
+#include "failing_allocator_functions.hpp"
 #include "osrf_testing_tools_cpp/memory_tools/memory_tools.hpp"
 #include "osrf_testing_tools_cpp/scope_exit.hpp"
 #include "rcl/error_handling.h"

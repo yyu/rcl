@@ -14,8 +14,8 @@
 
 #include "rcl/remap.h"
 
-#include "./arguments_impl.h"
-#include "./remap_impl.h"
+#include "arguments_impl.h"
+#include "remap_impl.h"
 #include "rcl/error_handling.h"
 #include "rcl/expand_topic_name.h"
 #include "rcutils/allocator.h"

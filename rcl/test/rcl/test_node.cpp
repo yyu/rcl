@@ -21,7 +21,7 @@
 #include "rcl/node.h"
 #include "rmw/rmw.h"  // For rmw_get_implementation_identifier.
 
-#include "./failing_allocator_functions.hpp"
+#include "failing_allocator_functions.hpp"
 #include "osrf_testing_tools_cpp/memory_tools/memory_tools.hpp"
 #include "osrf_testing_tools_cpp/scope_exit.hpp"
 #include "rcl/error_handling.h"

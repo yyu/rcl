@@ -21,7 +21,7 @@
 #include "test_msgs/msg/primitives.h"
 #include "test_msgs/srv/primitives.h"
 
-#include "./arg_macros.hpp"
+#include "arg_macros.hpp"
 
 #ifdef RMW_IMPLEMENTATION
 # define CLASSNAME_(NAME, SUFFIX) NAME ## __ ## SUFFIX

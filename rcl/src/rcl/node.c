@@ -43,7 +43,7 @@ extern "C"
 #include "rmw/validate_namespace.h"
 #include "rmw/validate_node_name.h"
 
-#include "./common.h"
+#include "common.h"
 
 
 #define ROS_SECURITY_ROOT_DIRECTORY_VAR_NAME "ROS_SECURITY_ROOT_DIRECTORY"

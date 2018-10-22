@@ -16,7 +16,7 @@
 #define RCL__ARGUMENTS_IMPL_H_
 
 #include "rcl/arguments.h"
-#include "./remap_impl.h"
+#include "remap_impl.h"
 
 #ifdef __cplusplus
 extern "C"

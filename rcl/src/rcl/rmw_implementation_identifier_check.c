@@ -28,7 +28,7 @@ extern "C"
 #include "rmw/rmw.h"
 
 #include "rcl/types.h"
-#include "./common.h"
+#include "common.h"
 
 // Extracted this portable method of doing a "shared library constructor" from SO:
 //   http://stackoverflow.com/a/2390626/671658

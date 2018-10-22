@@ -17,7 +17,7 @@ extern "C"
 {
 #endif
 
-#include "./common.h"  // NOLINT
+#include "common.h"  // NOLINT
 
 #include <stdlib.h>
 

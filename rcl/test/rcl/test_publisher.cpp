@@ -20,7 +20,7 @@
 #include "test_msgs/msg/primitives.h"
 #include "rosidl_generator_c/string_functions.h"
 
-#include "./failing_allocator_functions.hpp"
+#include "failing_allocator_functions.hpp"
 #include "osrf_testing_tools_cpp/scope_exit.hpp"
 #include "rcl/error_handling.h"
 

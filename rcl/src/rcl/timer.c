@@ -21,7 +21,7 @@ extern "C"
 
 #include <inttypes.h>
 
-#include "./stdatomic_helper.h"
+#include "stdatomic_helper.h"
 #include "rcl/error_handling.h"
 #include "rcutils/logging_macros.h"
 #include "rcutils/time.h"

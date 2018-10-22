@@ -32,7 +32,7 @@ extern "C"
 #include "rcl_lifecycle/default_state_machine.h"
 #include "rcl_lifecycle/transition_map.h"
 
-#include "./com_interface.h"
+#include "com_interface.h"
 
 rcl_lifecycle_state_t
 rcl_lifecycle_get_zero_initialized_state()

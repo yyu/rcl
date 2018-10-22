@@ -21,8 +21,8 @@ extern "C"
 
 #include <string.h>
 
-#include "./arguments_impl.h"
-#include "./stdatomic_helper.h"
+#include "arguments_impl.h"
+#include "stdatomic_helper.h"
 #include "rcl/arguments.h"
 #include "rcl/error_handling.h"
 #include "rcutils/logging_macros.h"
