@@ -428,6 +428,28 @@ RCL_WARN_UNUSED
 rcl_ret_t
 rcl_wait(rcl_wait_set_t * wait_set, int64_t timeout);
 
+/// Block until multiple wait sets are ready or until the timeout has been exceeded.
+/**
+ * This function has similar behavior as rcl_wait, but acts on multiple wait sets.
+ *
+ * This function will collect the items from the array of rcl_wait_set_t's and pass them
+ * to the underlying rmw_wait function.
+ *
+ * The items in the wait sets will be either left untouched or set to `NULL` after
+ * this function returns.
+ * Items that are not `NULL` are ready, where ready means different things based
+ * on the type of the item.
+ * For subscriptions this means there are messages that can be taken.
+ * For guard conditions this means the guard condition was triggered.
+ *
+ * TODO(jacobperron): Usage example
+ * TODO(jacobperron): Rest of docs
+ */
+RCL_PUBLIC
+RCL_WARN_UNUSED
+rcl_ret_t
+rcl_wait_multiple(rcl_wait_set_t ** wait_sets, const size_t num_wait_sets, int64_t timeout);
+
 #ifdef __cplusplus
 }
 #endif

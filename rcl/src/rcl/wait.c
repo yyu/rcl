@@ -614,6 +614,222 @@ rcl_wait(rcl_wait_set_t * wait_set, int64_t timeout)
   return RCL_RET_OK;
 }
 
+rcl_ret_t
+rcl_wait_multiple(rcl_wait_set_t ** wait_sets, const size_t num_wait_sets, int64_t timeout)
+{
+  RCL_CHECK_ARGUMENT_FOR_NULL(wait_sets, RCL_RET_INVALID_ARGUMENT);
+  for (size_t i = 0; i < num_wait_sets; ++i) {
+    if (!__wait_set_is_valid(wait_sets[i])) {
+      RCL_SET_ERROR_MSG("wait set is invalid");
+      return RCL_RET_WAIT_SET_INVALID;
+    }
+    // TODO(jacobperron): maybe it's okay as long as not all wait sets are empty?
+    if  (
+      wait_sets[i]->size_of_subscriptions == 0 &&
+      wait_sets[i]->size_of_guard_conditions == 0 &&
+      wait_sets[i]->size_of_timers == 0 &&
+      wait_sets[i]->size_of_clients == 0 &&
+      wait_sets[i]->size_of_services == 0)
+    {
+      RCL_SET_ERROR_MSG("wait set is empty");
+      return RCL_RET_WAIT_SET_EMPTY;
+    }
+  }
+
+  // TODO(jacobperron): Macro-ize for re-use between rcl_wait?
+  // Calculate the timeout argument.
+  // By default, set the timer to block indefinitely if none of the below conditions are met.
+  rmw_time_t * timeout_argument = NULL;
+  rmw_time_t temporary_timeout_storage;
+
+  bool is_timer_timeout = false;
+  int64_t min_timeout = timeout > 0 ? timeout : INT64_MAX;
+  // Calculate the number of valid (non-NULL and non-canceled) timers
+  // Also count the total for other items across all wait sets
+  size_t total_number_of_valid_timers = 0u;
+  size_t total_number_of_subscriptions = 0u;
+  size_t total_number_of_guard_conditions = 0u;
+  size_t total_number_of_clients = 0u;
+  size_t total_number_of_services = 0u;
+  for (size_t j = 0; j < num_wait_sets; ++j) {
+    rcl_wait_set_t * wait_set = wait_sets[j];
+    size_t number_of_valid_timers = wait_set->size_of_timers;
+    uint64_t i = 0;
+    for (i = 0; i < wait_set->impl->timer_index; ++i) {
+      if (!wait_set->timers[i]) {
+        number_of_valid_timers--;
+        continue;  // Skip NULL timers.
+      }
+      bool is_canceled = false;
+      rcl_ret_t ret = rcl_timer_is_canceled(wait_set->timers[i], &is_canceled);
+      if (ret != RCL_RET_OK) {
+        return ret;  // The rcl error state should already be set.
+      }
+      if (is_canceled) {
+        number_of_valid_timers--;
+        wait_set->timers[i] = NULL;
+        continue;
+      }
+      rmw_guard_conditions_t * rmw_gcs = &(wait_set->impl->rmw_guard_conditions);
+      size_t gc_idx = wait_set->size_of_guard_conditions + i;
+      if (NULL != rmw_gcs->guard_conditions[gc_idx]) {
+        // This timer has a guard condition, so move it to make a legal wait set.
+        rmw_gcs->guard_conditions[rmw_gcs->guard_condition_count] =
+          rmw_gcs->guard_conditions[gc_idx];
+        ++(rmw_gcs->guard_condition_count);
+      } else {
+        // No guard condition, instead use to set the rmw_wait timeout
+        int64_t timer_timeout = INT64_MAX;
+        rcl_ret_t ret = rcl_timer_get_time_until_next_call(wait_set->timers[i], &timer_timeout);
+        if (ret != RCL_RET_OK) {
+          return ret;  // The rcl error state should already be set.
+        }
+        if (timer_timeout < min_timeout) {
+          is_timer_timeout = true;
+          min_timeout = timer_timeout;
+        }
+      }
+    }  // for (i = 0; i < wait_set->impl->timer_index; ++i)
+    total_number_of_valid_timers += number_of_valid_timers;
+    total_number_of_subscriptions += wait_set->size_of_subscriptions;
+    total_number_of_guard_conditions += wait_set->size_of_guard_conditions;
+    total_number_of_clients += wait_set->size_of_clients;
+    total_number_of_services += wait_set->size_of_services;
+  }  // for (size_t j = 0; j < num_wait_sets; ++j)
+
+  if (timeout == 0) {
+    // Then it is non-blocking, so set the temporary storage to 0, 0 and pass it.
+    temporary_timeout_storage.sec = 0;
+    temporary_timeout_storage.nsec = 0;
+    timeout_argument = &temporary_timeout_storage;
+  } else if (timeout > 0 || total_number_of_valid_timers > 0) {
+    // If min_timeout was negative, we need to wake up immediately.
+    if (min_timeout < 0) {
+      min_timeout = 0;
+    }
+    temporary_timeout_storage.sec = RCL_NS_TO_S(min_timeout);
+    temporary_timeout_storage.nsec = min_timeout % 1000000000;
+    timeout_argument = &temporary_timeout_storage;
+  }
+  RCUTILS_LOG_DEBUG_EXPRESSION_NAMED(
+    !timeout_argument, ROS_PACKAGE_NAME, "Waiting without timeout");
+  RCUTILS_LOG_DEBUG_EXPRESSION_NAMED(
+    timeout_argument, ROS_PACKAGE_NAME,
+    "Waiting with timeout: %" PRIu64 "s + %" PRIu64 "ns",
+    temporary_timeout_storage.sec, temporary_timeout_storage.nsec);
+  RCUTILS_LOG_DEBUG_NAMED(
+    ROS_PACKAGE_NAME, "Timeout calculated based on next scheduled timer: %s",
+    is_timer_timeout ? "true" : "false");
+
+  // Collate items in all wait sets before passing to rmw
+  // TODO(jacobperron): Use allocator for temporary arrays to satisfy MSVC
+  // rcl_allocator_t allocator = wait_set[0]->impl->allocator;
+  rmw_subscriptions_t * collated_rmw_subscriptions[total_number_of_subscriptions];
+  size_t collated_subscriptions_index = 0u;
+  rmw_guard_conditions_t * collated_rmw_guard_conditions[total_number_of_guard_conditions];
+  rmw_services_t * collated_rmw_services[total_number_of_services];
+  rmw_clients_t * collated_rmw_clients[total_number_of_clients];
+  // Why 2x number of subscriptions???
+  rmw_wait_set_t * collated_rmw_wait_set = rmw_create_wait_set(
+    2 * total_number_of_subscriptions +
+    total_number_of_guard_conditions +
+    total_number_of_clients +
+    total_number_of_services);
+
+  for (size_t i = 0; i < num_wait_sets; ++i) {
+    size_t j;
+    rcl_wait_set_t * wait_set = wait_sets[i];
+    for (j = 0; j < wait_set->size_of_subscriptions; ++j) {
+      collated_rmw_subscriptions[collated_subscriptions_index + j] =
+        wait_set->impl->rmw_subscriptions.subscribers[j];
+    }
+    collated_subscriptions_index += j;
+    // TODO(jacobperron): guard conditions, services, and clients
+  }
+
+  // Wait.
+  rmw_ret_t ret = rmw_wait(
+    collated_rmw_subscriptions,
+    collated_rmw_guard_conditions,
+    collated_rmw_services,
+    collated_rmw_clients,
+    collated_rmw_wait_set,
+    timeout_argument);
+  // TODO(jacobperron): Error handling
+
+  // Cleanup
+  ret = rmw_destroy_wait_set(collated_rmw_wait_set);
+  // TODO(jacobperron): Error handling
+  // TODO(jacobperron): Cleanup allocated collated arrays
+
+  // Items that are not ready will have been set to NULL by rmw_wait.
+  // Update rcl handles accordingly.
+
+  // Check for ready timers
+  // and set not ready timers (which includes canceled timers) to NULL.
+  /*
+   TODO(jacobperron): Implement 
+  size_t i;
+  for (i = 0; i < wait_set->impl->timer_index; ++i) {
+    if (!wait_set->timers[i]) {
+      continue;
+    }
+    bool is_ready = false;
+    rcl_ret_t ret = rcl_timer_is_ready(wait_set->timers[i], &is_ready);
+    if (ret != RCL_RET_OK) {
+      return ret;  // The rcl error state should already be set.
+    }
+    RCUTILS_LOG_DEBUG_EXPRESSION_NAMED(is_ready, ROS_PACKAGE_NAME, "Timer in wait set is ready");
+    if (!is_ready) {
+      wait_set->timers[i] = NULL;
+    }
+  }
+  // Check for timeout, return RCL_RET_TIMEOUT only if it wasn't a timer.
+  if (ret != RMW_RET_OK && ret != RMW_RET_TIMEOUT) {
+    RCL_SET_ERROR_MSG(rmw_get_error_string().str);
+    return RCL_RET_ERROR;
+  }
+  // Set corresponding rcl subscription handles NULL.
+  for (i = 0; i < wait_set->size_of_subscriptions; ++i) {
+    bool is_ready = wait_set->impl->rmw_subscriptions.subscribers[i] != NULL;
+    RCUTILS_LOG_DEBUG_EXPRESSION_NAMED(
+      is_ready, ROS_PACKAGE_NAME, "Subscription in wait set is ready");
+    if (!is_ready) {
+      wait_set->subscriptions[i] = NULL;
+    }
+  }
+  // Set corresponding rcl guard_condition handles NULL.
+  for (i = 0; i < wait_set->size_of_guard_conditions; ++i) {
+    bool is_ready = wait_set->impl->rmw_guard_conditions.guard_conditions[i] != NULL;
+    RCUTILS_LOG_DEBUG_EXPRESSION_NAMED(
+      is_ready, ROS_PACKAGE_NAME, "Guard condition in wait set is ready");
+    if (!is_ready) {
+      wait_set->guard_conditions[i] = NULL;
+    }
+  }
+  // Set corresponding rcl client handles NULL.
+  for (i = 0; i < wait_set->size_of_clients; ++i) {
+    bool is_ready = wait_set->impl->rmw_clients.clients[i] != NULL;
+    RCUTILS_LOG_DEBUG_EXPRESSION_NAMED(is_ready, ROS_PACKAGE_NAME, "Client in wait set is ready");
+    if (!is_ready) {
+      wait_set->clients[i] = NULL;
+    }
+  }
+  // Set corresponding rcl service handles NULL.
+  for (i = 0; i < wait_set->size_of_services; ++i) {
+    bool is_ready = wait_set->impl->rmw_services.services[i] != NULL;
+    RCUTILS_LOG_DEBUG_EXPRESSION_NAMED(is_ready, ROS_PACKAGE_NAME, "Service in wait set is ready");
+    if (!is_ready) {
+      wait_set->services[i] = NULL;
+    }
+  }
+
+  if (RMW_RET_TIMEOUT == ret && !is_timer_timeout) {
+    return RCL_RET_TIMEOUT;
+  }
+  */
+  return RCL_RET_OK;
+}
 #ifdef __cplusplus
 }
 #endif
