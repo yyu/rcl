@@ -325,20 +325,16 @@ rcl_action_send_goal_response(
 /**
  * This is a non-blocking call.
  *
- * Creates and returns a new goal handle.
- * The action server starts tracking it internally.
- * If a failure occurs, `NULL` is returned and an error message is set.
- * Possible reasons for failure:
- *   - action server is invalid
- *   - goal info is invalid
- *   - goal ID is already being tracked by the action server
- *   - memory allocation failure
+ * The action server starts tracking the provided goal internally.
  *
  * This function should be called after receiving a new goal request with
  * rcl_action_take_goal_request() and before sending a response with
  * rcl_action_send_goal_response().
  *
  * After calling this function, the action server will start tracking the goal.
+ * The goal handle provided must be valid and is expected to be valid until
+ * the goal is expired with rcl_action_expire_goals() or the action server
+ * is finalized with rcl_action_server_fini().
  *
  * Example usage:
  *
@@ -350,16 +346,22 @@ rcl_action_send_goal_response(
  * rcl_ret_t ret = rcl_action_take_goal_request(&action_server, &goal_request);
  * // ... error handling
  * // If the goal is accepted, then tell the action server
- * // First, create and populate a goal info message (rcl type)
+ * // First, create and populate a goal handle
  * rcl_action_goal_info_t goal_info = rcl_action_get_zero_initialized_goal_info();
  * ret = rcl_action_goal_info_init(&goal_info, &action_server);
  * // ... error handling, and populate with goal ID and timestamp
- * ret = rcl_action_accept_new_goal(&action_server, &goal_info, NULL);
+ * rcl_action_goal_handle_t goal_handle = rcl_action_get_zero_initialized_goal_handle();
+ * ret = rcl_action_goal_handle_init(&goal_handle, &goal_info, rcl_get_default_allocator());
+ * // ... error handling
+ * ret = rcl_action_accept_new_goal(&action_server, &goal_info);
  * // ... error_handling
  * // ... Populate goal response (client library type)
  * ret = rcl_action_send_goal_response(&action_server, &goal_response);
- * // ... error handling, and sometime before shutdown finalize goal info message
- * ret = rcl_action_goal_info_fini(&goal_info, &action_server);
+ * // ... error handling, and sometime before shutdown finalize goal info and handle
+ * ret = rcl_action_goal_handle_fini(&goal_handle);
+ * // ... error handling
+ * ret = rcl_action_goal_info_fini(&goal_info);
+ * // ... error handling
  * ```
  *
  * <hr>
@@ -371,16 +373,20 @@ rcl_action_send_goal_response(
  * Lock-Free          | Yes
  *
  * \param[in] action_server handle to the action server that is accepting the goal
- * \param[in] goal_info a message containing info about the goal being accepted
- * \return a pointer to a new goal handle representing the accepted goal, or
- * \return `NULL` if a failure occured.
+ * \param[in] goal_handle a valid goal handle to start tracking
+ * \return `RCL_RET_OK` if the goal was accepted successfully, or
+ * \return `RCL_RET_ACTION_SERVER_INVALID` if the action server is invalid, or
+ * \return `RCL_RET_ACTION_GOAL_HANDLE_INVALID` if the goal handle is invalid or a goal
+ *   with the same ID is already being tracked by the action server, or
+ * \return `RCL_RET_BAD_ALLOC` if memory allocation fails, or
+ * \return `RCL_RET_ERROR` if an unspecified error occurs.
  */
 RCL_ACTION_PUBLIC
 RCL_WARN_UNUSED
 rcl_action_goal_handle_t *
 rcl_action_accept_new_goal(
   rcl_action_server_t * action_server,
-  const rcl_action_goal_info_t * goal_info);
+  rcl_action_goal_handle_t * goal_handle);
 
 /// Publish a ROS feedback message for an active goal using an action server.
 /**
