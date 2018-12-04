@@ -39,17 +39,37 @@ extern "C"
  * <hr>
  * Attribute          | Adherence
  * ------------------ | -------------
- * Allocates Memory   | No
+ * Allocates Memory   | Yes
  * Thread-Safe        | No
  * Uses Atomics       | No
  * Lock-Free          | Yes
  *
  * \param global_args The global arguments for the system
+ * \param allocator Used to allocate memory used by the logging system
  * \return `RCL_RET_OK` if successful.
  * \return `RCL_RET_ERR` if a general error occurs
  */
 RCL_PUBLIC
-rcl_ret_t rcl_logging_configure(const rcl_arguments_t * global_args);
+rcl_ret_t rcl_logging_configure(
+  const rcl_arguments_t * global_args,
+  const rcl_allocator_t * allocator);
+
+/**
+ * This function should be called to tear down the logging setup by the configure function.
+ *
+ * <hr>
+ * Attribute          | Adherence
+ * ------------------ | -------------
+ * Allocates Memory   | No
+ * Thread-Safe        | No
+ * Uses Atomics       | No
+ * Lock-Free          | Yes
+ *
+ * \return `RCL_RET_OK` if successful.
+ * \return `RCL_RET_ERR` if a general error occurs
+ */
+RCL_PUBLIC
+rcl_ret_t rcl_logging_fini();
 
 #ifdef __cplusplus
 }

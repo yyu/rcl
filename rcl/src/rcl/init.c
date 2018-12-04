@@ -112,7 +112,7 @@ rcl_init(
     goto fail;
   }
 
-  fail_ret = rcl_logging_configure(&context->global_arguments);
+  fail_ret = rcl_logging_configure(&context->global_arguments, &allocator);
   if (RCL_RET_OK != fail_ret) {
     RCUTILS_LOG_ERROR_NAMED(ROS_PACKAGE_NAME, "Failed to configure logging. %i", fail_ret);
     goto fail;
@@ -173,6 +173,10 @@ rcl_shutdown(rcl_context_t * context)
     RCL_SET_ERROR_MSG(rmw_get_error_string().str);
     return rcl_convert_rmw_ret_to_rcl_ret(rmw_ret);
   }
+
+  rcl_ret_t rcl_ret = rcl_logging_fini();
+  RCUTILS_LOG_ERROR_EXPRESSION_NAMED(RCL_RET_OK != rcl_ret, ROS_PACKAGE_NAME,
+    "Failed to fini logging. %i", rcl_ret);
 
   return RCL_RET_OK;
 }
